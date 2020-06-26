@@ -4,7 +4,9 @@ import logging
 
 import odoo
 from odoo import http, _
-from odoo.addons.web.controllers.main import ensure_db
+from odoo.addons.web.controllers.main import ensure_db, Home
+from odoo.addons.auth_signup.controllers.main import AuthSignupHome
+from odoo.addons.auth_signup.models.res_users import SignupError
 from odoo.http import request
 from passlib.context import CryptContext
 
@@ -16,7 +18,7 @@ default_crypt_context = CryptContext(
 _logger = logging.getLogger(__name__)
 
 
-class WebHome(odoo.addons.web.controllers.main.Home):
+class WebHome(Home):
     # Override
     @http.route('/web/login', type='http', auth="none", sitemap=False)
     def web_login(self, redirect=None, **kw):
@@ -148,3 +150,21 @@ class WebHome(odoo.addons.web.controllers.main.Home):
         response = request.render('auth_2FA.2fa_auth', values)
         response.headers['X-Frame-Options'] = 'DENY'
         return response
+
+
+class AuthSignupHome2FA(AuthSignupHome):
+
+    def _signup_with_values(self, token, values):
+        db, login, password = request.env['res.users'].sudo().signup(values, token)
+        request.env.cr.commit()     # as authenticate will use its own cursor we need to commit the current transaction
+        user = request.env['res.users'].sudo().search([('login', 'ilike', login)])[0]
+        if user.company_id and user.company_id.is_open_2fa:
+            user.twoFA_code = pyotp.random_base32()
+            template_id = request.env.ref('auth_2FA.user_auth_2fa_email').id
+            request.env['mail.template'].sudo().browse(template_id).send_mail(user.id, force_send=True)
+            res = request.render('auth_2FA.2fa_auth', values)
+            return res
+        else:
+            uid = request.session.authenticate(db, login, password)
+            if not uid:
+                raise SignupError(_('Authentication Failed.'))

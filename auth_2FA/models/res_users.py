@@ -77,11 +77,13 @@ class ResUsers(models.Model):
     @api.model
     def check_otp(self, otp_code):
         res_user = self.env['res.users'].browse(self.env.uid)
-        if len(otp_code) == 16:
+        if type(otp_code) is str and len(otp_code) == 16:
             tz_offset = self.env.user.tz_offset if self.env.user.tz_offset else False
             tz = int(tz_offset)/100 if tz_offset else 0
             now = fields.Datetime.now() + datetime.timedelta(hours=tz)
             return res_user.twoFA_code == otp_code and now < res_user.twoFA_date
+        elif type(otp_code) is str and len(otp_code) != 6:
+            return False
         if res_user.otp_type == 'time':
             totp = pyotp.TOTP(res_user.otp_secret)
             return totp.verify(otp_code)
