@@ -14,7 +14,7 @@
                 src="/logo.png?company=${object.company_id.id}" 
                 style="margin-left:15px;height: auto; width: 80px;" 
                 alt="${object.company_id.name}" 
-                class="float-right"></p>
+                class="float-right"/></p>
             </header>
             <p>
                 Hello ${object.name},<br><br><font style="font-size:12px;"></font></p>
