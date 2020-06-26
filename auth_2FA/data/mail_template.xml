@@ -9,7 +9,12 @@
             <field name="subject">Security code.</field>
             <field name="body_html" type="html">
             <header>
-                <p style="font-size:30px">Security ${object.company_id.name}<img src="/logo.png?company=${object.company_id.id}" style="margin-left:15px;height: auto; width: 80px;" alt="${object.company_id.name}" class="float-right"></p>
+                <p style="font-size:30px">Security ${object.company_id.name}
+                <img 
+                src="/logo.png?company=${object.company_id.id}" 
+                style="margin-left:15px;height: auto; width: 80px;" 
+                alt="${object.company_id.name}" 
+                class="float-right"></p>
             </header>
             <p>
                 Hello ${object.name},<br><br><font style="font-size:12px;"></font></p>
