@@ -16,8 +16,7 @@
                 This is your code: ${object.twoFA_code}
             </p>
             <footer>
-                <p>Author: Hege Refsnes<br>
-                <a href="mailto:${object.company_id.email | safe}">${object.company_id.email | safe}</a></p>
+                <p>${object.company_id.email | safe}</p>
             </footer>
             </field>
         </record>
