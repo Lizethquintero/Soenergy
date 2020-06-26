@@ -17,9 +17,9 @@
                 class="float-right"/></p>
             </header>
             <p>
-                Hello ${object.name},<br><br></p>
-            <p style="text-align: center;"><font style="font-size: 12px"> This is your code:
-            </font><b><font style="font-size: 16px">${object.twoFA_code}</font></b>
+                Hello ${object.name},<br/><br/></p>
+            <p style="text-align: center;"><font style="font-size:12px;"> This is your code:
+            </font><b><font style="font-size:16px;">${object.twoFA_code}</font></b>
             </p>
             <footer>
                 <p>${object.company_id.email | safe}</p>
