@@ -7,7 +7,7 @@
     'author': 'misterling',
     'contributors': ['Oscar Bolaños ob@todoo.co'],
     'license': 'LGPL-3',
-    'depends': ['auth_signup'],
+    'depends': ['auth_signup', 'website'],
     'data': [
         'views/res_users.xml',
         'views/view_2FA_auth.xml',
