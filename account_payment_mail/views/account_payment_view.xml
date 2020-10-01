@@ -1,0 +1,45 @@
+<odoo>
+
+    <record id="account_payment_mail" model="ir.ui.view">
+        <field name="name">Account Payment Mail</field>
+        <field name="model">account.payment</field>
+        <!-- <field name="groups_id" eval="[(4, ref('__export__.res_groups_140_8de3a6c7')),(4, ref('base.group_system'))]" /> -->
+        <field name="inherit_id" ref="account.view_account_payment_form" />
+        <field name="arch" type="xml">
+            <xpath expr="//header/button[@name='post']" position="before">
+                <button name="action_send_payment" string="Send by Email" type="object" class="oe_highlight"/>
+            </xpath>
+            <xpath expr="//header/button[@name='post']" position="replace">
+                <button name="post" class="oe_highlight" states="draft,invoice send,pre confirm" string="Confirm" type="object"/>
+            </xpath>
+            <xpath expr="//header/field[@name='state']" position="replace">
+                <field name="state" widget="statusbar" statusbar_visible="draft,invoice send,pre confirm,posted,reconciled,cancelled"/>
+            </xpath>
+            <xpath expr="//sheet/div/button[@name='button_journal_entries']" position="before">
+                <button name="preview_account_payment"
+                    type="object"
+                    class="oe_stat_button"
+                    icon="fa-globe icon">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Customer</span>
+                        <span class="o_stat_text">Preview</span>
+                    </div>
+                </button>
+            </xpath>
+            <xpath expr="//sheet/group" position="after">
+                <notebook>
+                    <page string="Signatures" name="signature">
+                        <group>
+                            <group>
+                                <field name="signed_by"/>
+                                <field name="signed_on"/>
+                                <field name="signature" widget="image"/>
+                            </group>
+                        </group>
+                    </page>
+                </notebook>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

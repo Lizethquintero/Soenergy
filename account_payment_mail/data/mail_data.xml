@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="account_payment_mail_template" model="mail.template">
+        <field name="name">Account Payment Mail Template</field>
+        <field name="model_id" ref="account.model_account_payment"/>
+        <field name="subject">${object.company_id.name} ${'Invoice:'} (Ref ${object.name or 'n/a' })</field>
+        <field name="email_from">${(object.company_id.email or company_id.email) | safe}</field>
+        <field name="partner_to">${object.partner_id.id}</field>
+        <field name="body_html" type="html">
+            <div style="margin: 0px; padding: 0px;">
+                <!-- <header>
+                    <p style="font-size:30px">${object.company_id.name}
+                    <img 
+                    src="/logo.png?company=${object.company_id.id}" 
+                    style="margin-left:15px;height: auto; width: 150px;" 
+                    alt="${object.company_id.name}" 
+                    class="float-right"/></p>
+                </header> -->
+                <p style="margin: 0px; padding: 0px; font-size: 13px;">
+                    % set doc_name = 'Invoice'
+                    Gracias por elegirnos.
+                    <br/><br/>
+                    Su factura: <strong>${object.name}</strong>
+                    por un valor de
+                    %if object.price_list:
+                        <strong>${format_amount(object.amount, object.price_list.currency_id)}</strong>
+                    %else:
+                        <strong>${format_amount(object.amount, object.currency_id)}</strong> 
+                    % endif
+                    esta disponible para su revision. Si está de acuerdo con la información enviada por favor firmar la factura para continuar con el proceso.
+                    <br/><br/>
+                    <br/><br/>
+                    No dude en ponerse en contacto con nosotros si tiene alguna pregunta o algún cambio. 
+                </p>
+            </div>
+        </field>
+        <field name="report_template" ref="account.action_report_payment_receipt"/>
+        <field name="report_name">${(object.name or '').replace('/','_')}</field>
+        <field name="lang">${object.partner_id.lang}</field>
+        <field name="user_signature" eval="False"/>
+        <field name="auto_delete" eval="True"/>
+        </record>
+
+        <template id="mail_notification_account_payment" inherit_id="mail.mail_notification_paynow" name="Payment notification">
+            <xpath expr="//t[@t-if='record.user_id and not record.env.user._is_superuser()']" position="replace">
+                
+            </xpath>
+        </template>
+
+    </data>
+</odoo>
