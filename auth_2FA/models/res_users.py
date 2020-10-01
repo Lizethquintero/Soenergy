@@ -10,11 +10,12 @@ import io
 from odoo import models, fields, api, _, tools
 from odoo.http import request
 from odoo.exceptions import AccessDenied
+from odoo import exceptions 
 
 import logging
 
 _logger = logging.getLogger(__name__)
-
+variable = False
 
 class ResUsers(models.Model):
     _inherit = 'res.users'
@@ -24,8 +25,8 @@ class ResUsers(models.Model):
                                 string="Type",
                                 help="Type of 2FA, time = new code for each period, counter = new code for each login")
     otp_secret = fields.Char(string="Secret", size=16, help='16 character base32 secret',
-                             default=lambda self: pyotp.random_base32())
-    otp_counter = fields.Integer(string="Counter", default=0)
+                            default=lambda self: pyotp.random_base32())
+    otp_counter = fields.Integer(string="Counter", default=1)
     otp_digits = fields.Integer(string="Digits", default=6, help="Length of the code")
     otp_period = fields.Integer(string="Period", default=30, help="Seconds to update code")
     otp_qrcode = fields.Binary(compute="_compute_otp_qrcode")
@@ -35,6 +36,11 @@ class ResUsers(models.Model):
     twoFA_code = fields.Char(string="Secret CODE", size=16, help='16 character base32 secret temporal code',
                              default=lambda self: pyotp.random_base32())
     twoFA_date = fields.Datetime('Datetime code', compute='_compute_twoFA_date')
+    aut_type2FA = fields.Selection(selection=[('QR Code', _('QR Code')), ('Email', _('Email'))], default='Email',
+                                string="Type of authentication",
+                                help="Type of 2FA authentication")
+    require_2FA = fields.Boolean(string='Open 2FA', default=False)
+    require_2FA_flag = fields.Boolean(string='Open 2FA', default=False)
 
     @api.depends('twoFA_code')
     def _compute_twoFA_date(self):
@@ -67,39 +73,47 @@ class ResUsers(models.Model):
         for record in self:
             if record.otp_type == 'time':
                 record.otp_uri = pyotp.utils.build_uri(secret=record.otp_secret, name=record.login,
-                                                     issuer_name=record.company_id.name, period=record.otp_period)
+                                                     issuer=record.company_id.name, period=record.otp_period)
             else:
                 record.otp_uri = pyotp.utils.build_uri(secret=record.otp_secret, name=record.login,
-                                                     initial_count=record.otp_counter, issuer_name=record.company_id.name,
+                                                     initial_count=record.otp_counter, issuer=record.company_id.name,
                                                      digits=record.otp_digits)
 
     # Verify otp verification code is correct
     @api.model
     def check_otp(self, otp_code):
         res_user = self.env['res.users'].browse(self.env.uid)
-        if type(otp_code) is str and len(otp_code) == 16:
-            tz_offset = self.env.user.tz_offset if self.env.user.tz_offset else False
-            tz = int(tz_offset)/100 if tz_offset else 0
-            now = fields.Datetime.now() + datetime.timedelta(hours=tz)
-            return res_user.twoFA_code == otp_code and now < res_user.twoFA_date
-        elif type(otp_code) is str and len(otp_code) != 6:
-            return False
-        if res_user.otp_type == 'time':
-            totp = pyotp.TOTP(res_user.otp_secret)
-            return totp.verify(otp_code)
-        elif res_user.otp_type == 'count':
-            hotp = pyotp.HOTP(res_user.otp_secret)
-            # Allow users to accidentally click 20 times more, but the code that has been used cannot be used again
-            for count in range(res_user.otp_counter, res_user.otp_counter + 20):
-                if count > 0 and hotp.verify(otp_code, count):
-                    res_user.otp_counter = count + 1
-                    return True
+        if res_user.aut_type2FA == 'Email' and res_user.require_2FA:
+            if type(otp_code) is str and len(otp_code) == 16:
+                tz_offset = self.env.user.tz_offset if self.env.user.tz_offset else False
+                tz = int(tz_offset)/100 if tz_offset else 0
+                now = fields.Datetime.now() + datetime.timedelta(hours=tz)
+                return res_user.twoFA_code == otp_code and now < res_user.twoFA_date
+        elif res_user.aut_type2FA == 'QR Code' and res_user.require_2FA:
+            self.require_2FA_flag = False
+            if type(otp_code) is str and len(otp_code) != 6:
+                return False
+            if res_user.otp_type == 'time':
+                totp = pyotp.TOTP(res_user.otp_secret)
+                return totp.verify(otp_code)
+            elif res_user.otp_type == 'count':
+                hotp = pyotp.HOTP(res_user.otp_secret)
+                for i in range(0,20):
+                    print(hotp.at(i), i)
+                # Allow users to accidentally click 20 times more, but the code that has been used cannot be used again
+                for count in range(res_user.otp_counter, res_user.otp_counter + 20):
+                    val = hotp.verify(otp_code, count)
+                    if count > 0 and val:
+                        self.require_2FA_flag = True
+                        res_user.otp_counter = count + 1
+                        return True
         return False
 
     # Override native _check_credentials, increase two-factor authentication
     def _check_credentials(self, password):
         super(ResUsers, self)._check_credentials(password)
         # Determine whether to turn on two-factor authentication and verify the verification code
-        if self.sudo().company_id.is_open_2fa and not self.sudo().check_otp(request.params.get('tfa_code')):
-            # pass
-            raise AccessDenied(_('Validation Code Error!'))
+        if not self.require_2FA_flag:
+            if self.sudo().company_id.is_open_2fa and not self.sudo().check_otp(request.params.get('tfa_code')) and self.sudo().require_2FA:
+                # pass
+                raise AccessDenied(_('Validation Code Error!'))

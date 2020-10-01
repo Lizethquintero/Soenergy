@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-import pyotp
+import re
 import logging
+import pyotp
 
 import odoo
 from odoo import http, _
@@ -20,7 +21,7 @@ _logger = logging.getLogger(__name__)
 
 class WebHome(Home):
     # Override
-    @http.route('/web/login', type='http', auth="none", sitemap=False)
+    @http.route('/web/login', type='http', auth="public", sitemap=False)
     def web_login(self, redirect=None, **kw):
         ensure_db()
         request.params['login_success'] = False
@@ -37,56 +38,78 @@ class WebHome(Home):
             values['databases'] = None
 
         if request.httprequest.method == 'POST':
-            if values.get('send_mail') and values.get('send_mail') == "send":
+            # if values.get('send_mail') and values.get('send_mail') == "send": 
+            user = request.env['res.users'].sudo().search([('login','ilike',values['login'])])
+            if user:        
                 user = request.env['res.users'].sudo().search([('login','ilike',values['login'])])[0]
+                user.require_2FA_flag = False
+            else:
+                values = request.params.copy()
+                values['error'] = _("Wrong login")
+                response = request.render('web.login', values)
+                response.headers['X-Frame-Options'] = 'DENY'
+                return response
+            if user.aut_type2FA == 'Email' and user.require_2FA:
                 user.twoFA_code = pyotp.random_base32()
                 template_id = request.env.ref('auth_2FA.user_auth_2fa_email').id
                 request.env['mail.template'].sudo().browse(template_id).send_mail(user.id, force_send=True)
+                values['text'] = _('A validation code has been sent to the registered email. Please use it to continue')
             old_uid = request.uid
-            try:
-                request.env.cr.execute(
-                    '''
-                        SELECT id,
-                               COALESCE(company_id, NULL), 
-                               COALESCE(password, ''), 
-                               COALESCE(otp_first_use, TRUE) 
-                        FROM res_users 
-                        WHERE login=%s
-                    ''',
-                    [request.params['login']]
-                )
-                res = request.env.cr.fetchone()
-                if not res:
-                    raise odoo.exceptions.AccessDenied(_('Wrong login account'))
-                [user_id, company_id, hashed, otp_first_use] = res
-                if company_id and request.env['res.company'].sudo().browse(company_id).is_open_2fa:
-                    # Verify password correctness
-                    valid, replacement = default_crypt_context.verify_and_update(request.params['password'], hashed)
-                    if replacement is not None:
-                        self._set_encrypted_password(self.env.user.id, replacement)
-                    if valid:
-                        if otp_first_use:
-                            values['QRCode'] = 'data:image/png;base64,' + request.env['res.users'].sudo().browse(
-                                user_id).otp_qrcode.decode('ascii')
-                            values['text'] = _('You are the first time to use OTP,' 
-                                               'please scan the QRCode to get validation code.'
-                                               'you should store this QRCode image and take good care of it! ')
-                        response = request.render('auth_2FA.2fa_auth', values)
-                        response.headers['X-Frame-Options'] = 'DENY'
-                        return response
+            login_mail = request.params['login']
+            mail_validation = re.match(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]{0,10}", login_mail)
+            if mail_validation and len(mail_validation.group())==len(login_mail):
+                try:
+                    request.env.cr.execute(
+                        '''
+                            SELECT id,
+                                COALESCE(company_id, NULL), 
+                                COALESCE(password, ''), 
+                                COALESCE(otp_first_use, TRUE) 
+                            FROM res_users 
+                            WHERE login=%s
+                        ''',
+                        [request.params['login']]
+                    )
+                    res = request.env.cr.fetchone()
+                    if not res:
+                        raise odoo.exceptions.AccessDenied(_('Wrong login account'))
+                    [user_id, company_id, hashed, otp_first_use] = res
+                    if company_id and request.env['res.company'].sudo().browse(company_id).is_open_2fa and user.require_2FA:
+                        # Verify password correctness
+                        valid, replacement = default_crypt_context.verify_and_update(request.params['password'], hashed)
+                        if replacement is not None:
+                            self._set_encrypted_password(self.env.user.id, replacement)
+                        if valid:
+                            if otp_first_use and user.aut_type2FA == 'QR Code' and user.require_2FA:
+                                values['QRCode'] = 'data:image/png;base64,' + request.env['res.users'].browse(
+                                    user_id).otp_qrcode.decode('ascii')
+                                values['text'] = _('You are the first time to use OTP, ' 
+                                                'please scan the QR Code to get validation code with Google Authenticator app on your cell phone. '
+                                                'You should store this QRCode image and take good care of it!. ')
+                            elif user.aut_type2FA == 'QR Code' and user.require_2FA:
+                                values['text'] = _('Please use the validation code given in the Google Authenticator app.')
+                            response = request.render('auth_2FA.2fa_auth', values)
+                            response.headers['X-Frame-Options'] = 'DENY'
+                            return response
+                        else:
+                            raise odoo.exceptions.AccessDenied()
+                    # Two-factor authentication is not turned on
+                    uid = request.session.authenticate(request.session.db, request.params['login'],
+                                                    request.params['password'])
+                    request.params['login_success'] = True
+                    return http.redirect_with_hash(self._login_redirect(uid, redirect=redirect))
+                except odoo.exceptions.AccessDenied as e:
+                    request.uid = old_uid
+                    if e.args == odoo.exceptions.AccessDenied().args:
+                        values['error'] = _("Wrong login/password")
                     else:
-                        raise odoo.exceptions.AccessDenied()
-                # Two-factor authentication is not turned on
-                uid = request.session.authenticate(request.session.db, request.params['login'],
-                                                   request.params['password'])
-                request.params['login_success'] = True
-                return http.redirect_with_hash(self._login_redirect(uid, redirect=redirect))
-            except odoo.exceptions.AccessDenied as e:
-                request.uid = old_uid
-                if e.args == odoo.exceptions.AccessDenied().args:
-                    values['error'] = _("Wrong login/password")
-                else:
-                    values['error'] = e.args[0]
+                        values['error'] = e.args[0]
+            else:
+                values = request.params.copy()
+                values['error'] = _("Wrong login")
+                response = request.render('web.login', values)
+                response.headers['X-Frame-Options'] = 'DENY'
+                return response
         else:
             if 'error' in request.params and request.params.get('error') == 'access':
                 values['error'] = _('Only employee can access this database. Please contact the administrator.')
@@ -108,7 +131,7 @@ class WebHome(Home):
         response.headers['X-Frame-Options'] = 'DENY'
         return response
 
-    @http.route('/web/login/2fa_auth', type='http', auth="none")
+    @http.route('/web/login/2fa_auth', type='http', auth="public",website=True)
     def web_login_2fa_auth(self, redirect=None, **kw):
         ensure_db()
         request.params['login_success'] = False
@@ -158,10 +181,10 @@ class AuthSignupHome2FA(AuthSignupHome):
         db, login, password = request.env['res.users'].sudo().signup(values, token)
         request.env.cr.commit()     # as authenticate will use its own cursor we need to commit the current transaction
         user = request.env['res.users'].sudo().search([('login', 'ilike', login)])[0]
-        if user.company_id and user.company_id.is_open_2fa:
-            user.twoFA_code = pyotp.random_base32()
+        if user.company_id and user.company_id.is_open_2fa and user.require_2FA:
+            # user.twoFA_code = pyotp.random_base32()
             template_id = request.env.ref('auth_2FA.user_auth_2fa_email').id
-            request.env['mail.template'].sudo().browse(template_id).send_mail(user.id, force_send=True)
+            # request.env['mail.template'].sudo().browse(template_id).send_mail(user.id, force_send=True)
             res = request.render('auth_2FA.2fa_auth', values)
             return res
         else:

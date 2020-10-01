@@ -5,8 +5,9 @@
             <form class="oe_login_form" role="form" t-attf-action="/web/login/2fa_auth{{ '?debug' if debug else '' }}"
                   method="post" onsubmit="this.action = this.action + location.hash">
                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
-                <div style="text-align: center;" t-if="QRCode">
-                    <img t-att-src="QRCode" />
+                <!-- <div style="text-align: center;" t-if="QRCode"> -->
+                <div style="text-align: center;">
+                    <img t-att-src="QRCode" t-if="QRCode"/>
                     <p><t t-esc="text" /></p>
                 </div>
                 <div class="form-group field-login">
@@ -36,10 +37,10 @@
         </t>
     </template>
 
-    <template id="auth_2FA.login_2fa" inherit_id="web.login" name="Web login 2FA">
+    <!-- <template id="auth_2FA.login_2fa" inherit_id="web.login" name="Web login 2FA">
         <xpath expr="//div[@class='form-group field-password']" position="after">
             <input type="radio" id="send_mail" name="send_mail" value="send"/>
             <label for="send_mail">Send code to my email.</label>
         </xpath>
-    </template>
+    </template> -->
 </odoo>

@@ -17,10 +17,12 @@
                 class="float-right"/></p>
             </header>
             <p>
-                Hello ${object.name},<br/><br/></p>
-            <p style="text-align: center;"><font style="font-size:12px;"> This is your code:
+                Dear ${object.name},<br/><br/></p>
+            <p style="text-align: center;"><font style="font-size:12px;"> Please use this code to login in Odoo:
             </font><b><font style="font-size:16px;">${object.twoFA_code}</font></b>
             </p>
+            <br></br>
+            <p>Thanks!</p>
             <footer>
                 <p>${object.company_id.email | safe}</p>
             </footer>

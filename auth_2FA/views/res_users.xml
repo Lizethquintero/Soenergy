@@ -15,12 +15,14 @@
                 <notebook colspan="4" position="inside">
                     <page string="2FA">
                         <group col="4" colspan="4">
-                            <field name="otp_secret"/>
-                            <field name="otp_type"/>
+                            <field name="require_2FA"/>
+                            <field name="aut_type2FA" required="True"/>
+                            <field name="twoFA_code"/>
+                            <field name="otp_type" attrs="{'invisible':[('aut_type2FA', '==', 'Email')]}"/>
                             <field name="otp_counter"
-                                   attrs="{'invisible':[('otp_type', '==', 'time')], 'readonly': True}"/>
-                            <field name="otp_digits" attrs="{'invisible':[('otp_type', '==', 'time')]}"/>
-                            <field name="otp_period" attrs="{'invisible':[('otp_type', '==', 'count')]}"/>
+                                   attrs="{'invisible':['|',('otp_type', '==', 'time'),('aut_type2FA', '==', 'Email')], 'readonly': True}"/>
+                            <field name="otp_digits" invisible="True"/>
+                            <field name="otp_period" readonly="True" attrs="{'invisible':['|',('otp_type', '==', 'count')]}"/>
                         </group>
                         <div class="row" style="display: block;text-align: center;">
                             <field name="otp_qrcode" widget="image" nolabel="1"/>
