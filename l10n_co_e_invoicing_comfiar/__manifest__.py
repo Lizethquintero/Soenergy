@@ -7,7 +7,7 @@
     "name": "Colombian E-Invoicing with COMFIAR",
     "category": "Financial",
     "version": "10.0.1.0.0",
-    "author": "Bernardo D. Lara Guevara bl@todoo.co",
+    "author": "Bernardo D. Lara Guevara bl@todoo.co ",
     "website": "http://www.exaap.com",
     "license": "AGPL-3",
     "summary": "Colombian E-Invoicing",
