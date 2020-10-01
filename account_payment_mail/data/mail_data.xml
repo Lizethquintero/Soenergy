@@ -21,7 +21,10 @@
                     % set doc_name = 'Invoice'
                     Gracias por elegirnos.
                     <br/><br/>
-                    Su factura: <strong>${object.name}</strong>
+                    Su factura
+                    %if object.name:
+                        <strong>${object.name}</strong>
+                    % endif
                     por un valor de
                     %if object.price_list:
                         <strong>${format_amount(object.amount, object.price_list.currency_id)}</strong>
