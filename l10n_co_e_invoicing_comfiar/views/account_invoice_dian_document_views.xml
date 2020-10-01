@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>SUPRA
+<?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <data>
         <record id="account_invoice_dian_document_view_tree" model="ir.ui.view">
